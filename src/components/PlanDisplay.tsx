@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Copy, Download, RefreshCw, PenTool, Speaker, Zap, Image as ImageIcon } from "lucide-react";
-import { ImageGenerator } from "./ImageGenerator"; // Using default import
+ // Using default import
 
 // --- Type Definitions ---
 interface Exercise {
@@ -152,7 +152,7 @@ const WorkoutDisplay = ({ plan }: { plan: GeneratedPlan }) => (
                                         >
                                             <Speaker className="h-3 w-3 mr-1" /> Speak
                                         </Button>
-                                        <ImageGenerator prompt={ex.exercise} />
+                                        
                                     </div>
                                 </li>
                             ))}
@@ -198,7 +198,7 @@ const DietDisplay = ({ plan }: { plan: GeneratedPlan }) => (
                                     >
                                         <Speaker className="h-3 w-3 mr-1" /> Speak
                                     </Button>
-                                    <ImageGenerator prompt={item} />
+                                    
                                 </div>
                             </li>
                         ))}
