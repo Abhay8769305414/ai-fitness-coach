@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Copy, Download, RefreshCw, PenTool, Speaker, Zap, Image as ImageIcon } from "lucide-react";
-import ImageGenerator from "./ImageGenerator"; // Using default import
+import { ImageGenerator } from "./ImageGenerator"; // Using default import
 
 // --- Type Definitions ---
 interface Exercise {

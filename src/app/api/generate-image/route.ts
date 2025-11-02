@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     if (!apiResponse.ok) {
       // If API fails, return a placeholder image instead of an error
       return NextResponse.json({
-        imageUrl: `https://placehold.co/600x400/purple/white?text=${encodeURIComponent(prompt)}`
+        imageUrl: `https://via.placeholder.com/600x400/purple/white?text=${encodeURIComponent(prompt)}`
       });
     }
 
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     if (!imageData) {
       // If no image data, return a placeholder
       return NextResponse.json({
-        imageUrl: `https://placehold.co/600x400/purple/white?text=${encodeURIComponent(prompt)}`
+        imageUrl: `https://via.placeholder.com/600x400/purple/white?text=${encodeURIComponent(prompt)}`
       });
     }
 
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     
     // Return a placeholder image on error
     return NextResponse.json({
-      imageUrl: `https://placehold.co/600x400/purple/white?text=Error+Generating+Image`
+      imageUrl: `https://via.placeholder.com/600x400/purple/white?text=Error+Generating+Image`
     });
   }
 }

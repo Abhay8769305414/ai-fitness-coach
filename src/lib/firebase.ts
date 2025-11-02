@@ -25,14 +25,14 @@ import {
     DocumentData
 } from 'firebase/firestore';
 
-// Firebase configuration - using a placeholder config for development
+// Firebase configuration - using environment variables for Vercel deployment
 const firebaseConfig = {
-  apiKey: "AIzaSyDummyApiKey123456789",
-  authDomain: "ai-fitness-coach-app.firebaseapp.com",
-  projectId: "ai-fitness-coach-app",
-  storageBucket: "ai-fitness-coach-app.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abcdef1234567890"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyDummyApiKey123456789",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "ai-fitness-coach-app.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "ai-fitness-coach-app",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "ai-fitness-coach-app.appspot.com",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "123456789012",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:123456789012:web:abcdef1234567890"
 };
 
 // Initialize Firebase App
