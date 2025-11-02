@@ -1,32 +1,22 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-// FIX: Using the correct, final alias path. We assume configuration (tsconfig.json) is correct.
-import { PlanInputForm } from "@/components/PlanInputForm"; 
-import { PlanDisplay } from "@/components/PlanDisplay"; 
+import React, { useState, useEffect, useCallback } from 'react';
+// FIX: Using the correct module imports (assuming the components folder is found)
+import { PlanInputForm } from "../../components/PlanInputForm"; 
+import { PlanDisplay } from "../../components/PlanDisplay"; 
 // ----------------------------------------------------------------------
 import { Button } from "@/components/ui/button";
-import { Loader2, LayoutGrid, Trash2, PenTool, Eye, X, Lightbulb, CheckCircle2, Save } from 'lucide-react';
+import { Loader2, Zap, LayoutGrid, Trash2, PenTool, Eye } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-// Import GSAP animations
-import { 
-  animateMainHeading, 
-  animateInputForm, 
-  animatePlanSections, 
-  animateQuote, 
-  animateAITips, 
-  animateSavedPlans,
-  initializeHoverAnimations
-} from '@/lib/animations';
 
-// FIX: Importing corrected function names from firebase.ts
+// FIX: Corrected imports to match the function names exported by src/lib/firebase.ts
 import { 
-    initializeFirebase, 
+    initializeFirebase, // initializeAuth is aliased to initializeFirebase
     getPlansCollectionRef, 
-    savePlanToDatabase, 
-    deletePlanFromDatabase, 
+    savePlanToFirestore, // CHANGED from savePlanToDatabase
+    deletePlanFromFirestore, // CHANGED from deletePlanFromDatabase
     getUserId 
 } from '@/lib/firebase';
 import { onSnapshot, query, orderBy } from 'firebase/firestore';
@@ -40,7 +30,6 @@ interface GeneratedPlan {
     workout_plan: WorkoutDay[]; 
     diet_plan: Meal[]; 
     ai_tips: AITips; 
-    tips?: string[];
 }
 type PlanInput = {
     name: string; age: number; gender: 'Male' | 'Female' | 'Other'; height_cm: number;
@@ -113,19 +102,11 @@ export default function Home() {
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
     const [dailyQuote, setDailyQuote] = useState<string>('Discipline is the bridge between goals and accomplishment.'); // Default quote
-    
-    // Refs for animation targets
-    const mainHeadingRef = useRef<HTMLDivElement>(null);
-    const formCardRef = useRef<HTMLDivElement>(null);
-    const planSectionsRef = useRef<HTMLDivElement>(null);
-    const quoteRef = useRef<HTMLDivElement>(null);
-    const aiTipsRef = useRef<HTMLDivElement>(null);
-    const savedPlansRef = useRef<HTMLDivElement>(null);
 
     // 1. Initial Auth, Firestore Listener, and Daily Quote Setup
     useEffect(() => {
         // --- Auth Initialization ---
-        initializeFirebase().then(() => {
+        initializeFirebase().then(() => { // Using alias initializeFirebase
             setIsAuthReady(true);
         }).catch(console.error);
         
@@ -142,20 +123,6 @@ export default function Home() {
             }
         };
         fetchDailyQuote();
-        
-        // Initialize animations
-        if (mainHeadingRef.current) {
-            animateMainHeading(mainHeadingRef.current);
-        }
-        
-        if (formCardRef.current) {
-            animateInputForm(formCardRef.current);
-        }
-        
-        // Initialize hover animations
-        setTimeout(() => {
-            initializeHoverAnimations();
-        }, 1000);
     }, []);
 
     useEffect(() => {
@@ -164,43 +131,42 @@ export default function Home() {
         // --- Firestore Listener ---
         try {
             const plansRef = getPlansCollectionRef();
+            // Check if collection ref is valid before querying
+            if (!plansRef) return;
+
+            const q = query(plansRef, orderBy("createdAt", "desc"));
             
-            // FIX C: Only proceed if the collection reference is valid
-            if (plansRef) {
-                const q = query(plansRef, orderBy("createdAt", "desc"));
-                
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const plansList: SavedPlan[] = [];
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        let parsedPlan: GeneratedPlan | undefined;
-                        
-                        // FIX B: Ensure data.plan is valid before parsing
-                        if (typeof data.plan === 'string') {
-                            try {
-                                parsedPlan = JSON.parse(data.plan); 
-                            } catch(e) {
-                                console.error("Failed to parse plan JSON from Firestore document:", doc.id, e);
-                            }
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const plansList: SavedPlan[] = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    let parsedPlan: GeneratedPlan | undefined;
+                    
+                    // We must ensure 'plan' exists before trying to parse
+                    if (data.plan) {
+                        try {
+                            parsedPlan = JSON.parse(data.plan); 
+                        } catch(e) {
+                            console.error("Failed to parse plan JSON from Firestore document:", doc.id, e);
+                            return;
                         }
-
-                        // Only push if parsing was successful
-                        if (parsedPlan) {
-                            plansList.push({
-                                id: doc.id,
-                                name: data.name,
-                                goal: data.goal,
-                                level: data.level,
-                                plan: parsedPlan, // Now guaranteed to be GeneratedPlan
-                                createdAt: data.createdAt?.toDate() || new Date(),
-                            });
-                        }
+                    } else {
+                        return; // Skip document if plan field is missing
+                    }
+                    
+                    plansList.push({
+                        id: doc.id,
+                        name: data.name,
+                        goal: data.goal,
+                        level: data.level,
+                        plan: parsedPlan, // TypeScript is now happy because we checked above
+                        createdAt: data.createdAt?.toDate() || new Date(),
                     });
-                    setSavedPlans(plansList);
                 });
+                setSavedPlans(plansList);
+            });
 
-                return () => unsubscribe(); // Cleanup the listener
-            }
+            return () => unsubscribe(); // Cleanup the listener
 
         } catch (e) {
             console.error("Error setting up Firestore listener. You may need to enable Firestore in your project.", e);
@@ -229,29 +195,6 @@ export default function Home() {
             const result = await response.json();
             setCurrentPlan(result.plan as GeneratedPlan);
             setShowPlan(true);
-            
-            // Animate plan sections when they appear
-            setTimeout(() => {
-                if (planSectionsRef.current) {
-                    const sections = planSectionsRef.current.querySelectorAll('.plan-card');
-                    if (sections.length) {
-                        animatePlanSections(Array.from(sections) as HTMLElement[]);
-                    }
-                }
-                
-                // Animate quote
-                if (quoteRef.current) {
-                    animateQuote(quoteRef.current);
-                }
-                
-                // Animate AI Tips
-                if (aiTipsRef.current) {
-                    animateAITips(aiTipsRef.current);
-                }
-                
-                // Re-initialize hover animations for new content
-                initializeHoverAnimations();
-            }, 300);
 
         } catch (error) {
             console.error("Plan Generation Error:", error);
@@ -276,7 +219,8 @@ export default function Home() {
                 goal: currentPlanInput.fitness_goal,
                 level: currentPlanInput.fitness_level,
             };
-            await savePlanToDatabase(currentPlan, metadata);
+            // FIX: Using savePlanToFirestore
+            await savePlanToFirestore(currentPlan, metadata); 
             alert("Plan saved successfully!");
         } catch (error) {
             console.error("Save Plan Error:", error);
@@ -308,7 +252,7 @@ export default function Home() {
 
     // --- Render Components ---
     const SavedPlansSection = () => (
-        <div ref={savedPlansRef} className="w-full max-w-6xl mx-auto space-y-4 pt-12">
+        <div className="w-full max-w-6xl mx-auto space-y-4 pt-12">
             <h3 className="text-3xl font-extrabold flex items-center text-primary">
                 <LayoutGrid className="w-6 h-6 mr-2" /> Your Saved Fitness Plans
             </h3>
@@ -321,9 +265,9 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {savedPlans.length > 0 ? (
                     savedPlans.map((plan) => (
-                        <Card key={plan.id} className="shadow-md hover:shadow-lg transition duration-200 flex flex-col plan-card">
+                        <Card key={plan.id} className="shadow-md hover:shadow-lg transition duration-200 flex flex-col">
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-lg truncate">{plan.name}&apos;s Plan</CardTitle> 
+                                <CardTitle className="text-lg truncate">{plan.name}&apos;s Plan</CardTitle>
                                 <CardDescription className="text-xs">Goal: {plan.goal} • Level: {plan.level}</CardDescription>
                                 <CardDescription className="text-xs">Saved: {plan.createdAt.toLocaleDateString()}</CardDescription>
                             </CardHeader>
@@ -339,7 +283,8 @@ export default function Home() {
                                     size="sm" 
                                     variant="destructive" 
                                     className="w-10"
-                                    onClick={() => deletePlanFromDatabase(plan.id)}
+                                    // FIX: Using deletePlanFromFirestore
+                                    onClick={() => deletePlanFromFirestore(plan.id)}
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -358,7 +303,7 @@ export default function Home() {
     return (
         <main className="min-h-screen p-4 md:p-8">
             <header className="flex justify-between items-center max-w-7xl mx-auto py-4">
-                <h1 ref={mainHeadingRef} className="text-3xl font-extrabold tracking-tight text-primary">
+                <h1 className="text-3xl font-extrabold tracking-tight text-primary">
                     AI Fitness Coach
                 </h1>
                 <ThemeToggle />
@@ -366,7 +311,7 @@ export default function Home() {
 
             {/* Daily Quote Section (Now dynamic) */}
             <div className="w-full max-w-6xl mx-auto pt-4">
-                <Card className="p-4 bg-gradient-to-r from-yellow-100 to-yellow-50 dark:from-gray-800 dark:to-gray-900 border-l-4 border-yellow-500">
+                <Card className="p-4 mt-8 bg-gradient-to-r from-yellow-100 to-yellow-50 dark:from-gray-800 dark:to-gray-900 border-l-4 border-yellow-500">
                     <p className="text-sm italic text-yellow-800 dark:text-yellow-300 font-medium">
                         &quot;Daily Motivation: {dailyQuote}&quot;
                     </p>
@@ -388,28 +333,24 @@ export default function Home() {
 
             {/* Display Plan or Form */}
             {!isLoading && (showPlan && currentPlan) ? (
-                <div ref={planSectionsRef}>
-                    <PlanDisplay 
-                        plan={currentPlan} 
-                        onRegenerate={handleRegenerate} 
-                        onEdit={handleEdit}
-                        onSave={handleSavePlan} // Pass save handler
-                        dailyQuote={dailyQuote} // Pass dailyQuote prop
-                    />
-                </div>
+                <PlanDisplay 
+                    plan={currentPlan} 
+                    onRegenerate={handleRegenerate} 
+                    onEdit={handleEdit}
+                    onSave={handleSavePlan} // Pass save handler
+                    dailyQuote={dailyQuote} // Pass daily quote
+                />
             ) : (
                 <>
                     <section className="text-center py-12">
-                        <h2 className="4xl md:text-5xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
+                        <h2 className="text-4xl md:text-5xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
                             Your Personalized Fitness Journey Starts Here
                         </h2>
                         <p className="text-xl text-muted-foreground">
                             Answer a few questions to generate a tailored workout and diet plan.
                         </p>
                     </section>
-                    <div ref={formCardRef}>
-                        <PlanInputForm onPlanGenerated={handleGeneratePlan} isLoading={isLoading} />
-                    </div>
+                    <PlanInputForm onPlanGenerated={handleGeneratePlan} isLoading={isLoading} /> 
                 </>
             )}
 
