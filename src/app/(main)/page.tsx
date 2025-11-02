@@ -1,361 +1,427 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 // Using the standard, correct alias path. This depends on a correct tsconfig.json.
-import { PlanInputForm } from "@/components/PlanInputForm"; 
-import { PlanDisplay } from "@/components/PlanDisplay"; 
+import { PlanInputForm } from "@/components/PlanInputForm";
+import { PlanDisplay } from "@/components/PlanDisplay";
 // ----------------------------------------------------------------------
 import { Button } from "@/components/ui/button";
-import { Loader2, Zap, LayoutGrid, Trash2, PenTool, Eye } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Loader2, Zap, LayoutGrid, Trash2, PenTool, Eye } from "lucide-react";
+import { useTheme } from "next-themes";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription,
+} from "@/components/ui/card";
 
 // Corrected imports to match the function names exported by src/lib/firebase.ts
-import { 
-    initializeFirebase, 
-    getPlansCollectionRef, 
-    savePlanToFirestore, 
-    deletePlanFromFirestore, 
-    getUserId 
-} from '@/lib/firebase';
-import { onSnapshot, query, orderBy } from 'firebase/firestore';
+import {
+  initializeFirebase,
+  getPlansCollectionRef,
+  savePlanToFirestore,
+  deletePlanFromFirestore,
+  getUserId,
+} from "@/lib/firebase";
+import { onSnapshot, query, orderBy } from "firebase/firestore";
 
 // --- Type Definitions (Must match other files) ---
-interface Exercise { exercise: string; sets: string; reps: string; rest: string; }
-interface WorkoutDay { day: string; focus: string; routine: Exercise[]; }
-interface Meal { meal: string; calories: string; items: string[]; }
-interface AITips { posture: string; lifestyle: string; }
-interface GeneratedPlan { 
-    workout_plan: WorkoutDay[]; 
-    diet_plan: Meal[]; 
-    ai_tips: AITips; 
+interface Exercise {
+  exercise: string;
+  sets: string;
+  reps: string;
+  rest: string;
+}
+interface WorkoutDay {
+  day: string;
+  focus: string;
+  routine: Exercise[];
+}
+interface Meal {
+  meal: string;
+  calories: string;
+  items: string[];
+}
+interface AITips {
+  posture: string;
+  lifestyle: string;
+}
+interface GeneratedPlan {
+  workout_plan: WorkoutDay[];
+  diet_plan: Meal[];
+  ai_tips: AITips;
 }
 type PlanInput = {
-    name: string; age: number; gender: 'Male' | 'Female' | 'Other'; height_cm: number;
-    weight_kg: number; fitness_goal: string; fitness_level: string; workout_location: string;
-    dietary_preference: string; optional_notes: string;
+  name: string;
+  age: number;
+  gender: "Male" | "Female" | "Other";
+  height_cm: number;
+  weight_kg: number;
+  fitness_goal: string;
+  fitness_level: string;
+  workout_location: string;
+  dietary_preference: string;
+  optional_notes: string;
 };
 interface SavedPlan {
-    id: string;
-    name: string;
-    goal: string;
-    level: string;
-    plan: GeneratedPlan;
-    createdAt: Date;
+  id: string;
+  name: string;
+  goal: string;
+  level: string;
+  plan: GeneratedPlan;
+  createdAt: Date;
 }
 
 // MOCK Data for initial rendering (keep as fallback)
 const MOCK_PLAN: GeneratedPlan = {
   workout_plan: [
-    { day: "Day 1", focus: "Full Body", routine: [
+    {
+      day: "Day 1",
+      focus: "Full Body",
+      routine: [
         { exercise: "Squats", sets: "3", reps: "10", rest: "60s" },
         { exercise: "Pushups", sets: "3", reps: "15", rest: "60s" },
-    ]},
+      ],
+    },
     { day: "Day 2", focus: "Rest", routine: [] },
     { day: "Day 7", focus: "Rest", routine: [] },
   ],
   diet_plan: [
-    { meal: "Breakfast", calories: "400 kcal", items: ["Oatmeal with fruit", "Protein Shake"] },
+    {
+      meal: "Breakfast",
+      calories: "400 kcal",
+      items: ["Oatmeal with fruit", "Protein Shake"],
+    },
   ],
   ai_tips: {
     posture: "Keep your back straight during lifts.",
     lifestyle: "Drink plenty of water.",
-  }
+  },
 };
-
 
 // Simple Theme Toggle
 const ThemeToggle = () => {
-    const { setTheme } = useTheme();
+  const { setTheme } = useTheme();
 
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                    <PenTool className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    <PenTool className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                    <span className="sr-only">Toggle theme</span>
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setTheme("light")}>
-                    Light
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("dark")}>
-                    Dark
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("system")}>
-                    System
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon">
+          <PenTool className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <PenTool className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme("light")}>
+          Light
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>
+          Dark
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>
+          System
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 };
 
-
 export default function Home() {
-    const [currentPlan, setCurrentPlan] = useState<GeneratedPlan | null>(null);
-    const [currentPlanInput, setCurrentPlanInput] = useState<PlanInput | null>(null);
-    const [showPlan, setShowPlan] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isAuthReady, setIsAuthReady] = useState(false);
-    const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
-    const [dailyQuote, setDailyQuote] = useState<string>('Discipline is the bridge between goals and accomplishment.'); // Default quote
+  const [currentPlan, setCurrentPlan] = useState<GeneratedPlan | null>(null);
+  const [currentPlanInput, setCurrentPlanInput] = useState<PlanInput | null>(
+    null
+  );
+  const [showPlan, setShowPlan] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
+  const [dailyQuote, setDailyQuote] = useState<string>(
+    "Discipline is the bridge between goals and accomplishment."
+  ); // Default quote
 
-    // 1. Initial Auth, Firestore Listener, and Daily Quote Setup
-    useEffect(() => {
-        // --- Auth Initialization ---
-        initializeFirebase().then(() => { 
-            setIsAuthReady(true);
-        }).catch(console.error);
-        
-        // --- Daily Quote Fetch (API call) ---
-        const fetchDailyQuote = async () => {
-            try {
-                const response = await fetch("/api/daily-quote");
-                if (response.ok) {
-                    const result = await response.json();
-                    setDailyQuote(result.quote);
-                }
-            } catch (e) {
-                console.warn("Failed to fetch daily quote API. Using default quote.", e);
-            }
-        };
-        fetchDailyQuote();
-    }, []);
+  // 1. Initial Auth, Firestore Listener, and Daily Quote Setup
+  useEffect(() => {
+    // --- Auth Initialization ---
+    initializeFirebase()
+      .then(() => {
+        setIsAuthReady(true);
+      })
+      .catch(console.error);
 
-    useEffect(() => {
-        if (!isAuthReady) return;
-
-        // --- Firestore Listener ---
-        try {
-            const plansRef = getPlansCollectionRef();
-            // Check if collection ref is valid before querying
-            if (!plansRef) return;
-
-            const q = query(plansRef, orderBy("createdAt", "desc"));
-            
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                const plansList: SavedPlan[] = [];
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    let parsedPlan: GeneratedPlan | undefined;
-                    
-                    // We must ensure 'plan' exists before trying to parse
-                    if (data.plan) {
-                        try {
-                            parsedPlan = JSON.parse(data.plan); 
-                        } catch(e) {
-                            console.error("Failed to parse plan JSON from Firestore document:", doc.id, e);
-                            return;
-                        }
-                    } else {
-                        return; // Skip document if plan field is missing
-                    }
-                    
-                    plansList.push({
-                        id: doc.id,
-                        name: data.name,
-                        goal: data.goal,
-                        level: data.level,
-                        plan: parsedPlan, // TypeScript is now happy because we checked above
-                        createdAt: data.createdAt?.toDate() || new Date(),
-                    });
-                });
-                setSavedPlans(plansList);
-            });
-
-            return () => unsubscribe(); // Cleanup the listener
-
-        } catch (e) {
-            console.error("Error setting up Firestore listener. You may need to enable Firestore in your project.", e);
+    // --- Daily Quote Fetch (API call) ---
+    const fetchDailyQuote = async () => {
+      try {
+        const response = await fetch("/api/daily-quote");
+        if (response.ok) {
+          const result = await response.json();
+          setDailyQuote(result.quote);
         }
-    }, [isAuthReady]);
-
-    
-    // Function to handle form submission and fetch plan from API
-    const handleGeneratePlan = async (userData: PlanInput) => {
-        setCurrentPlanInput(userData); 
-        setShowPlan(false);
-        setIsLoading(true);
-        setCurrentPlan(null);
-
-        try {
-            const response = await fetch("/api/generate-plan", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(userData),
-            });
-
-            if (!response.ok) {
-                throw new Error("Plan generation failed.");
-            }
-
-            const result = await response.json();
-            setCurrentPlan(result.plan as GeneratedPlan);
-            setShowPlan(true);
-
-        } catch (error) {
-            console.error("Plan Generation Error:", error);
-            setCurrentPlan(MOCK_PLAN); 
-            setShowPlan(true);
-            alert("Error generating plan (API Key/Quota issue?). Showing mock data for testing purposes.");
-        } finally {
-            setIsLoading(false);
-        }
+      } catch (e) {
+        console.warn(
+          "Failed to fetch daily quote API. Using default quote.",
+          e
+        );
+      }
     };
+    fetchDailyQuote();
+  }, []);
 
-    // Function to save the currently displayed plan
-    const handleSavePlan = useCallback(async () => {
-        if (!currentPlan || !currentPlanInput) {
-            alert("No plan generated yet to save!");
+  useEffect(() => {
+    if (!isAuthReady) return;
+
+    // --- Firestore Listener ---
+    try {
+      const plansRef = getPlansCollectionRef();
+      // Check if collection ref is valid before querying
+      if (!plansRef) return;
+
+      const q = query(plansRef, orderBy("createdAt", "desc"));
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const plansList: SavedPlan[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (!data.plan) return; // Skip if plan missing
+
+          let parsedPlan: GeneratedPlan;
+          try {
+            parsedPlan = JSON.parse(data.plan);
+          } catch (e) {
+            console.error(
+              "Failed to parse plan JSON from Firestore document:",
+              doc.id,
+              e
+            );
             return;
-        }
+          }
 
-        try {
-            const metadata = {
-                name: currentPlanInput.name,
-                goal: currentPlanInput.fitness_goal,
-                level: currentPlanInput.fitness_level,
-            };
-            await savePlanToFirestore(currentPlan, metadata); 
-            alert("Plan saved successfully!");
-        } catch (error) {
-            console.error("Save Plan Error:", error);
-            alert("Failed to save plan. See console for details. (Check Firebase setup)");
-        }
-    }, [currentPlan, currentPlanInput]);
+          // ✅ TypeScript is now sure parsedPlan is defined
+          plansList.push({
+            id: doc.id,
+            name: data.name,
+            goal: data.goal,
+            level: data.level,
+            plan: parsedPlan,
+            createdAt: data.createdAt?.toDate() || new Date(),
+          });
+        });
 
+        setSavedPlans(plansList);
+      });
 
-    // Function to display a saved plan
-    const handleLoadPlan = (plan: GeneratedPlan) => {
-        setCurrentPlan(plan);
-        setShowPlan(true);
-    };
+      return () => unsubscribe(); // Cleanup the listener
+    } catch (e) {
+      console.error(
+        "Error setting up Firestore listener. You may need to enable Firestore in your project.",
+        e
+      );
+    }
+  }, [isAuthReady]);
 
-    // Function to handle regeneration (shows the form again)
-    const handleRegenerate = () => {
-        setShowPlan(false);
-        setCurrentPlan(null);
-    };
+  // Function to handle form submission and fetch plan from API
+  const handleGeneratePlan = async (userData: PlanInput) => {
+    setCurrentPlanInput(userData);
+    setShowPlan(false);
+    setIsLoading(true);
+    setCurrentPlan(null);
 
-    // Function to edit details (shows the form again)
-    const handleEdit = () => {
-        setShowPlan(false);
-    };
+    try {
+      const response = await fetch("/api/generate-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userData),
+      });
 
-    // Display user ID for debugging and collaboration (MANDATORY)
-    const userId = isAuthReady ? getUserId() : 'Loading...';
+      if (!response.ok) {
+        throw new Error("Plan generation failed.");
+      }
 
+      const result = await response.json();
+      setCurrentPlan(result.plan as GeneratedPlan);
+      setShowPlan(true);
+    } catch (error) {
+      console.error("Plan Generation Error:", error);
+      setCurrentPlan(MOCK_PLAN);
+      setShowPlan(true);
+      alert(
+        "Error generating plan (API Key/Quota issue?). Showing mock data for testing purposes."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    // --- Render Components ---
-    const SavedPlansSection = () => (
-        <div className="w-full max-w-6xl mx-auto space-y-4 pt-12">
-            <h3 className="text-3xl font-extrabold flex items-center text-primary">
-                <LayoutGrid className="w-6 h-6 mr-2" /> Your Saved Fitness Plans
-            </h3>
-            <Card className="p-4 bg-muted/50 border-dashed border-2 border-border/70">
-                <p className="text-sm text-muted-foreground font-medium">
-                    Your User ID: **{userId}** (Used for secure, private data storage)
-                </p>
+  // Function to save the currently displayed plan
+  const handleSavePlan = useCallback(async () => {
+    if (!currentPlan || !currentPlanInput) {
+      alert("No plan generated yet to save!");
+      return;
+    }
+
+    try {
+      const metadata = {
+        name: currentPlanInput.name,
+        goal: currentPlanInput.fitness_goal,
+        level: currentPlanInput.fitness_level,
+      };
+      await savePlanToFirestore(currentPlan, metadata);
+      alert("Plan saved successfully!");
+    } catch (error) {
+      console.error("Save Plan Error:", error);
+      alert(
+        "Failed to save plan. See console for details. (Check Firebase setup)"
+      );
+    }
+  }, [currentPlan, currentPlanInput]);
+
+  // Function to display a saved plan
+  const handleLoadPlan = (plan: GeneratedPlan) => {
+    setCurrentPlan(plan);
+    setShowPlan(true);
+  };
+
+  // Function to handle regeneration (shows the form again)
+  const handleRegenerate = () => {
+    setShowPlan(false);
+    setCurrentPlan(null);
+  };
+
+  // Function to edit details (shows the form again)
+  const handleEdit = () => {
+    setShowPlan(false);
+  };
+
+  // Display user ID for debugging and collaboration (MANDATORY)
+  const userId = isAuthReady ? getUserId() : "Loading...";
+
+  // --- Render Components ---
+  const SavedPlansSection = () => (
+    <div className="w-full max-w-6xl mx-auto space-y-4 pt-12">
+      <h3 className="text-3xl font-extrabold flex items-center text-primary">
+        <LayoutGrid className="w-6 h-6 mr-2" /> Your Saved Fitness Plans
+      </h3>
+      <Card className="p-4 bg-muted/50 border-dashed border-2 border-border/70">
+        <p className="text-sm text-muted-foreground font-medium">
+          Your User ID: **{userId}** (Used for secure, private data storage)
+        </p>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {savedPlans.length > 0 ? (
+          savedPlans.map((plan) => (
+            <Card
+              key={plan.id}
+              className="shadow-md hover:shadow-lg transition duration-200 flex flex-col"
+            >
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg truncate">
+                  {plan.name}&apos;s Plan
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Goal: {plan.goal} • Level: {plan.level}
+                </CardDescription>
+                <CardDescription className="text-xs">
+                  Saved: {plan.createdAt.toLocaleDateString()}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-2 flex justify-between space-x-2">
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={() => handleLoadPlan(plan.plan)}
+                >
+                  <Eye className="w-4 h-4 mr-2" /> View Plan
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="w-10"
+                  // FIX: Using deletePlanFromFirestore
+                  onClick={() => deletePlanFromFirestore(plan.id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </CardContent>
             </Card>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {savedPlans.length > 0 ? (
-                    savedPlans.map((plan) => (
-                        <Card key={plan.id} className="shadow-md hover:shadow-lg transition duration-200 flex flex-col">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-lg truncate">{plan.name}&apos;s Plan</CardTitle>
-                                <CardDescription className="text-xs">Goal: {plan.goal} • Level: {plan.level}</CardDescription>
-                                <CardDescription className="text-xs">Saved: {plan.createdAt.toLocaleDateString()}</CardDescription>
-                            </CardHeader>
-                            <CardContent className="pt-2 flex justify-between space-x-2">
-                                <Button 
-                                    size="sm" 
-                                    className="w-full"
-                                    onClick={() => handleLoadPlan(plan.plan)}
-                                >
-                                    <Eye className="w-4 h-4 mr-2" /> View Plan
-                                </Button>
-                                <Button 
-                                    size="sm" 
-                                    variant="destructive" 
-                                    className="w-10"
-                                    // FIX: Using deletePlanFromFirestore
-                                    onClick={() => deletePlanFromFirestore(plan.id)}
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    ))
-                ) : (
-                    <Card className="md:col-span-4 p-8 text-center text-muted-foreground">
-                        No saved plans found. Generate and save your first personalized plan!
-                    </Card>
-                )}
-            </div>
+          ))
+        ) : (
+          <Card className="md:col-span-4 p-8 text-center text-muted-foreground">
+            No saved plans found. Generate and save your first personalized
+            plan!
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <main className="min-h-screen p-4 md:p-8">
+      <header className="flex justify-between items-center max-w-7xl mx-auto py-4">
+        <h1 className="text-3xl font-extrabold tracking-tight text-primary">
+          AI Fitness Coach
+        </h1>
+        <ThemeToggle />
+      </header>
+
+      {/* Daily Quote Section (Now dynamic) */}
+      <div className="w-full max-w-6xl mx-auto pt-4">
+        <Card className="p-4 mt-8 bg-gradient-to-r from-yellow-100 to-yellow-50 dark:from-gray-800 dark:to-gray-900 border-l-4 border-yellow-500">
+          <p className="text-sm italic text-yellow-800 dark:text-yellow-300 font-medium">
+            &quot;Daily Motivation: {dailyQuote}&quot;
+          </p>
+        </Card>
+      </div>
+
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-purple-500 mb-4" />
+          <h2 className="text-2xl font-semibold text-muted-foreground">
+            Crafting your personalized plan...
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            This may take up to 20 seconds. Thank you for your patience!
+          </p>
         </div>
-    );
+      )}
 
-    return (
-        <main className="min-h-screen p-4 md:p-8">
-            <header className="flex justify-between items-center max-w-7xl mx-auto py-4">
-                <h1 className="text-3xl font-extrabold tracking-tight text-primary">
-                    AI Fitness Coach
-                </h1>
-                <ThemeToggle />
-            </header>
+      {/* Display Plan or Form */}
+      {!isLoading && showPlan && currentPlan ? (
+        <PlanDisplay
+          plan={currentPlan}
+          onRegenerate={handleRegenerate}
+          onEdit={handleEdit}
+          onSave={handleSavePlan} // Pass save handler
+          dailyQuote={dailyQuote} // Pass daily quote
+        />
+      ) : (
+        <>
+          <section className="text-center py-12">
+            <h2 className="text-4xl md:text-5xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
+              Your Personalized Fitness Journey Starts Here
+            </h2>
+            <p className="text-xl text-muted-foreground">
+              Answer a few questions to generate a tailored workout and diet
+              plan.
+            </p>
+          </section>
+          <PlanInputForm
+            onPlanGenerated={handleGeneratePlan}
+            isLoading={isLoading}
+          />
+        </>
+      )}
 
-            {/* Daily Quote Section (Now dynamic) */}
-            <div className="w-full max-w-6xl mx-auto pt-4">
-                <Card className="p-4 mt-8 bg-gradient-to-r from-yellow-100 to-yellow-50 dark:from-gray-800 dark:to-gray-900 border-l-4 border-yellow-500">
-                    <p className="text-sm italic text-yellow-800 dark:text-yellow-300 font-medium">
-                        &quot;Daily Motivation: {dailyQuote}&quot;
-                    </p>
-                </Card>
-            </div>
-
-            {/* Loading State */}
-            {isLoading && (
-                <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-                    <Loader2 className="h-12 w-12 animate-spin text-purple-500 mb-4" />
-                    <h2 className="text-2xl font-semibold text-muted-foreground">
-                        Crafting your personalized plan...
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                        This may take up to 20 seconds. Thank you for your patience!
-                    </p>
-                </div>
-            )}
-
-            {/* Display Plan or Form */}
-            {!isLoading && (showPlan && currentPlan) ? (
-                <PlanDisplay 
-                    plan={currentPlan} 
-                    onRegenerate={handleRegenerate} 
-                    onEdit={handleEdit}
-                    onSave={handleSavePlan} // Pass save handler
-                    dailyQuote={dailyQuote} // Pass daily quote
-                />
-            ) : (
-                <>
-                    <section className="text-center py-12">
-                        <h2 className="text-4xl md:text-5xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
-                            Your Personalized Fitness Journey Starts Here
-                        </h2>
-                        <p className="text-xl text-muted-foreground">
-                            Answer a few questions to generate a tailored workout and diet plan.
-                        </p>
-                    </section>
-                    <PlanInputForm onPlanGenerated={handleGeneratePlan} isLoading={isLoading} /> 
-                </>
-            )}
-
-            {/* Display Saved Plans Section */}
-            {isAuthReady && <SavedPlansSection />}
-
-        </main>
-    );
+      {/* Display Saved Plans Section */}
+      {isAuthReady && <SavedPlansSection />}
+    </main>
+  );
 }
