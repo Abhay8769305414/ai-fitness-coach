@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-// FIX: Using the correct module imports (assuming the components folder is found)
-import { PlanInputForm } from "../../components/PlanInputForm"; 
-import { PlanDisplay } from "../../components/PlanDisplay"; 
+// Using the standard, correct alias path. This depends on a correct tsconfig.json.
+import { PlanInputForm } from "@/components/PlanInputForm"; 
+import { PlanDisplay } from "@/components/PlanDisplay"; 
 // ----------------------------------------------------------------------
 import { Button } from "@/components/ui/button";
 import { Loader2, Zap, LayoutGrid, Trash2, PenTool, Eye } from 'lucide-react';
@@ -11,12 +11,12 @@ import { useTheme } from 'next-themes';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 
-// FIX: Corrected imports to match the function names exported by src/lib/firebase.ts
+// Corrected imports to match the function names exported by src/lib/firebase.ts
 import { 
-    initializeFirebase, // initializeAuth is aliased to initializeFirebase
+    initializeFirebase, 
     getPlansCollectionRef, 
-    savePlanToFirestore, // CHANGED from savePlanToDatabase
-    deletePlanFromFirestore, // CHANGED from deletePlanFromDatabase
+    savePlanToFirestore, 
+    deletePlanFromFirestore, 
     getUserId 
 } from '@/lib/firebase';
 import { onSnapshot, query, orderBy } from 'firebase/firestore';
@@ -106,7 +106,7 @@ export default function Home() {
     // 1. Initial Auth, Firestore Listener, and Daily Quote Setup
     useEffect(() => {
         // --- Auth Initialization ---
-        initializeFirebase().then(() => { // Using alias initializeFirebase
+        initializeFirebase().then(() => { 
             setIsAuthReady(true);
         }).catch(console.error);
         
@@ -219,7 +219,6 @@ export default function Home() {
                 goal: currentPlanInput.fitness_goal,
                 level: currentPlanInput.fitness_level,
             };
-            // FIX: Using savePlanToFirestore
             await savePlanToFirestore(currentPlan, metadata); 
             alert("Plan saved successfully!");
         } catch (error) {
